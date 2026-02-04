@@ -1,0 +1,349 @@
+{
+  "info": {
+    "name": "Manutenção MVP - API Completa",
+    "description": "Collection completa: Auth + Clientes + Equipamentos + Ordens de Serviço",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "client_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "equipment_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "service_order_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('token', jsonData.data.token);",
+                  "    console.log('Token saved:', jsonData.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@techfrio.com.br\",\n  \"password\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Ordens de Serviço",
+      "item": [
+        {
+          "name": "Criar Ordem de Serviço",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('service_order_id', jsonData.data.id);",
+                  "    console.log('Service Order ID saved:', jsonData.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"{{client_id}}\",\n  \"equipmentId\": \"{{equipment_id}}\",\n  \"type\": \"PREVENTIVE\",\n  \"scheduledDate\": \"2026-02-10T10:00:00.000Z\",\n  \"description\": \"Manutenção preventiva trimestral\",\n  \"priority\": \"MEDIUM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/service-orders",
+              "host": ["{{base_url}}"],
+              "path": ["service-orders"]
+            }
+          }
+        },
+        {
+          "name": "Listar Ordens de Serviço",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/service-orders?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["service-orders"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "SCHEDULED",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "PREVENTIVE",
+                  "disabled": true
+                },
+                {
+                  "key": "clientId",
+                  "value": "{{client_id}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar Ordem de Serviço por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/service-orders/{{service_order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["service-orders", "{{service_order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Atualizar Ordem de Serviço",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scheduledDate\": \"2026-02-12T14:00:00.000Z\",\n  \"description\": \"Manutenção preventiva trimestral - Reagendada\",\n  \"priority\": \"HIGH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/service-orders/{{service_order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["service-orders", "{{service_order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Atualizar Status - Em Progresso",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/service-orders/{{service_order_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["service-orders", "{{service_order_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Atualizar Status - Concluída",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/service-orders/{{service_order_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["service-orders", "{{service_order_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Minhas Ordens (Técnico)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/service-orders/technician/me?status=SCHEDULED",
+              "host": ["{{base_url}}"],
+              "path": ["service-orders", "technician", "me"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "SCHEDULED"
+                },
+                {
+                  "key": "startDate",
+                  "value": "2026-02-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-02-28",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Calendário (Agenda)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/service-orders/calendar?startDate=2026-02-01&endDate=2026-02-28",
+              "host": ["{{base_url}}"],
+              "path": ["service-orders", "calendar"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-02-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-02-28"
+                },
+                {
+                  "key": "technicianId",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir Ordem de Serviço",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/service-orders/{{service_order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["service-orders", "{{service_order_id}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,683 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// 1. USUÁRIOS E AUTENTICAÇÃO
+// ============================================================================
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  TECHNICIAN
+  CLIENT
+}
+
+enum SubscriptionPlan {
+  FREE
+  INDIVIDUAL
+  BUSINESS
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  SUSPENDED
+  TRIAL
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  phone     String
+  role      UserRole @default(TECHNICIAN)
+  isActive  Boolean  @default(true)
+  
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  technician         Technician?
+  serviceOrders      ServiceOrder[]
+  maintenanceReports MaintenanceReport[]
+  quotations         Quotation[]
+  
+  @@map("users")
+}
+
+model Company {
+  id      String  @id @default(uuid())
+  name    String
+  cnpj    String? @unique
+  address String?
+  phone   String
+  email   String
+  website String?
+  logoUrl String?
+  
+  subscriptionPlan   SubscriptionPlan   @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  trialEndsAt        DateTime?
+  subscriptionEndsAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  users        User[]
+  technicians  Technician[]
+  clients      Client[]
+  equipments   Equipment[]
+  serviceOrders ServiceOrder[]
+  
+  @@map("companies")
+}
+
+model Technician {
+  id           String  @id @default(uuid())
+  userId       String  @unique
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  companyId    String
+  company      Company @relation(fields: [companyId], references: [id])
+  
+  registration String?
+  
+  specialties  String[]
+  
+  isAvailable  Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  serviceOrders         ServiceOrder[]
+  checklistExecutions   ChecklistExecution[]
+  maintenanceReports    MaintenanceReport[]
+  quotations            Quotation[]
+  
+  @@map("technicians")
+}
+
+// ============================================================================
+// 2. CLIENTES E EQUIPAMENTOS
+// ============================================================================
+
+model Client {
+  id          String  @id @default(uuid())
+  name        String
+  cnpj        String?
+  contactName String?
+  phone       String
+  email       String?
+  address     String
+  
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+  
+  isActive Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  branches       Branch[]
+  equipments     Equipment[]
+  serviceOrders  ServiceOrder[]
+  
+  @@map("clients")
+}
+
+model Branch {
+  id      String @id @default(uuid())
+  name    String
+  address String
+  phone   String?
+  
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  equipments Equipment[]
+  
+  @@map("branches")
+}
+
+enum EquipmentStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  RETIRED
+}
+
+enum EquipmentType {
+  AIR_CONDITIONING
+  COLD_ROOM
+  FREEZER
+  REFRIGERATOR
+  ICE_MACHINE
+  CHILLER
+  OVEN
+  FRYER
+  EXHAUST
+  ELECTRICAL_PANEL
+  GENERATOR
+}
+
+model Equipment {
+  id               String          @id @default(uuid())
+  type             EquipmentType
+  brand            String
+  model            String
+  serialNumber     String?
+  capacity         String?
+  installationDate DateTime?
+  location         String
+  
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+  
+  status EquipmentStatus @default(ACTIVE)
+  
+  notes String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  serviceOrders          ServiceOrder[]
+  checklistExecutions    ChecklistExecution[]
+  maintenanceAlerts      MaintenanceAlert[]
+  maintenanceReports     MaintenanceReport[]
+  quotations             Quotation[]
+  maintenanceHistory     MaintenanceHistory[]
+  
+  @@map("equipments")
+}
+
+// ============================================================================
+// 3. CHECKLISTS E TEMPLATES
+// ============================================================================
+
+enum ChecklistItemType {
+  VISUAL_INSPECTION
+  MEASUREMENT
+  TEST
+  CLEANING
+  ADJUSTMENT
+  REPLACEMENT
+  DOCUMENTATION
+}
+
+enum MaintenanceCategory {
+  ELECTRICAL
+  REFRIGERATION
+  MECHANICAL
+  SAFETY
+  STRUCTURE
+  HYGIENE
+  PERFORMANCE
+}
+
+enum CriticalityLevel {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model ChecklistTemplate {
+  id               String          @id @default(uuid())
+  name             String
+  equipmentType    EquipmentType
+  version          String
+  isActive         Boolean         @default(true)
+  isPremium        Boolean         @default(false)
+  
+  estimatedDuration       Int
+  minimumTechnicianLevel  String
+  requiredTools           String[]
+  requiredPPE             String[]
+  safetyWarnings          String[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  sections           ChecklistSection[]
+  checklistExecutions ChecklistExecution[]
+  
+  @@map("checklist_templates")
+}
+
+model ChecklistSection {
+  id          String              @id @default(uuid())
+  title       String
+  order       Int
+  description String?
+  category    MaintenanceCategory
+  
+  templateId String
+  template   ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  items ChecklistItem[]
+  
+  @@map("checklist_sections")
+}
+
+model ChecklistItem {
+  id                      String              @id @default(uuid())
+  code                    String
+  description             String
+  type                    ChecklistItemType
+  category                MaintenanceCategory
+  criticality             CriticalityLevel
+  
+  measurementMin          Float?
+  measurementMax          Float?
+  measurementIdeal        Float?
+  measurementUnit         String?
+  measurementTolerance    Float?
+  
+  expectedResult          String?
+  aiSuggestion            String?
+  
+  allowPhoto              Boolean             @default(false)
+  allowNotes              Boolean             @default(false)
+  requiresAction          Boolean             @default(false)
+  
+  regulatoryReference     String?
+  
+  frequencyValue          Int?
+  frequencyUnit           String?
+  
+  riskIfFailed            String?
+  
+  estimatedTimeMinutes    Int?
+  
+  sectionId String
+  section   ChecklistSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  
+  executionItems ChecklistExecutionItem[]
+  
+  @@map("checklist_items")
+}
+
+// ============================================================================
+// 4. ORDEM DE SERVIÇO E EXECUÇÃO
+// ============================================================================
+
+enum ServiceOrderType {
+  PREVENTIVE
+  CORRECTIVE
+  INSTALLATION
+  EMERGENCY
+}
+
+enum ServiceOrderStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+  ON_HOLD
+}
+
+enum ServiceOrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model ServiceOrder {
+  id               String              @id @default(uuid())
+  orderNumber      String              @unique
+  type             ServiceOrderType
+  status           ServiceOrderStatus  @default(SCHEDULED)
+  priority         ServiceOrderPriority @default(MEDIUM)
+  
+  scheduledDate    DateTime
+  startTime        String?
+  endTime          String?
+  duration         Int?
+  
+  description      String?
+  
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+  
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  checklistExecution ChecklistExecution?
+  maintenanceReport  MaintenanceReport?
+  quotation          Quotation?
+  maintenanceHistory MaintenanceHistory?
+  
+  @@map("service_orders")
+}
+
+enum ChecklistExecutionStatus {
+  IN_PROGRESS
+  COMPLETED
+  PARTIALLY_COMPLETED
+}
+
+model ChecklistExecution {
+  id String @id @default(uuid())
+  
+  serviceOrderId String        @unique
+  serviceOrder   ServiceOrder  @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  
+  templateId String
+  template   ChecklistTemplate @relation(fields: [templateId], references: [id])
+  
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  
+  startedAt   DateTime
+  completedAt DateTime?
+  
+  status ChecklistExecutionStatus @default(IN_PROGRESS)
+  
+  technicianNotes   String?
+  aiRecommendations String[]
+  
+  photosUrls String[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  items    ChecklistExecutionItem[]
+  findings Finding[]
+  
+  @@map("checklist_executions")
+}
+
+enum ChecklistItemStatus {
+  COMPLIANT
+  NON_COMPLIANT
+  REQUIRES_ATTENTION
+  NOT_APPLICABLE
+}
+
+model ChecklistExecutionItem {
+  id String @id @default(uuid())
+  
+  executionId String
+  execution   ChecklistExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  
+  itemId String
+  item   ChecklistItem @relation(fields: [itemId], references: [id])
+  
+  status ChecklistItemStatus
+  
+  measuredValue Float?
+  textValue     String?
+  
+  photoUrls String[]
+  notes     String?
+  
+  requiresFollowUp Boolean @default(false)
+  
+  timestamp DateTime @default(now())
+  
+  @@map("checklist_execution_items")
+}
+
+enum FindingUrgency {
+  IMMEDIATE
+  SHORT_TERM
+  MEDIUM_TERM
+  LONG_TERM
+}
+
+model Finding {
+  id String @id @default(uuid())
+  
+  executionId String
+  execution   ChecklistExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  
+  itemCode String
+  
+  severity      CriticalityLevel
+  description   String
+  recommendation String
+  
+  estimatedCost Float?
+  urgency       FindingUrgency
+  
+  photos String[]
+  
+  createdAt DateTime @default(now())
+  
+  quotationItems QuotationItem[]
+  
+  @@map("findings")
+}
+
+// ============================================================================
+// 5. DOCUMENTOS E PDFs
+// ============================================================================
+
+enum DocumentType {
+  MAINTENANCE_REPORT
+  QUOTATION
+  CONTRACT
+  INVOICE
+}
+
+enum ReportSeverity {
+  EXCELLENT
+  GOOD
+  ATTENTION
+  CRITICAL
+}
+
+model MaintenanceReport {
+  id String @id @default(uuid())
+  
+  serviceOrderId String       @unique
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  
+  reportNumber String @unique
+  
+  totalItems           Int
+  compliantItems       Int
+  nonCompliantItems    Int
+  requiresAttentionItems Int
+  overallSeverity      ReportSeverity
+  
+  generalObservations String?
+  
+  nextMaintenanceDate DateTime?
+  
+  pdfUrl         String?
+  pdfGeneratedAt DateTime?
+  
+  clientSignature     String?
+  clientSignatureDate DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("maintenance_reports")
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+model Quotation {
+  id String @id @default(uuid())
+  
+  serviceOrderId String?      @unique
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+  
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  
+  quotationNumber String   @unique
+  issueDate       DateTime @default(now())
+  validUntil      DateTime
+  
+  status QuotationStatus @default(DRAFT)
+  
+  subtotal           Float
+  discount           Float   @default(0)
+  discountPercentage Float   @default(0)
+  total              Float
+  
+  paymentConditions String?
+  warranty          String?
+  estimatedDelivery String?
+  
+  notes             String?
+  aiRecommendations String[]
+  
+  pdfUrl         String?
+  pdfGeneratedAt DateTime?
+  
+  sentAt     DateTime?
+  approvedAt DateTime?
+  rejectedAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  items QuotationItem[]
+  
+  @@map("quotations")
+}
+
+enum QuotationItemType {
+  PART
+  SERVICE
+  LABOR
+}
+
+model QuotationItem {
+  id String @id @default(uuid())
+  
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  
+  findingId String?
+  finding   Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  
+  type          QuotationItemType
+  description   String
+  quantity      Float
+  unitPrice     Float
+  total         Float
+  
+  urgency       FindingUrgency?
+  justification String?
+  
+  order Int @default(0)
+  
+  @@map("quotation_items")
+}
+
+// ============================================================================
+// 6. HISTÓRICO E ALERTAS
+// ============================================================================
+
+model MaintenanceHistory {
+  id String @id @default(uuid())
+  
+  serviceOrderId String       @unique
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  
+  type             ServiceOrderType
+  executedAt       DateTime
+  duration         Int?
+  
+  summary          String?
+  findingsCount    Int          @default(0)
+  criticalFindings Int          @default(0)
+  cost             Float?
+  
+  createdAt DateTime @default(now())
+  
+  @@map("maintenance_history")
+}
+
+enum AlertStatus {
+  PENDING
+  SENT
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model MaintenanceAlert {
+  id String @id @default(uuid())
+  
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  
+  type        ServiceOrderType @default(PREVENTIVE)
+  dueDate     DateTime
+  description String
+  
+  status AlertStatus @default(PENDING)
+  
+  sentAt         DateTime?
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("maintenance_alerts")
+}
